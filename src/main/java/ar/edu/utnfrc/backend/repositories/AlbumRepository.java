@@ -1,30 +1,35 @@
 package ar.edu.utnfrc.backend.repositories;
 
 import ar.edu.utnfrc.backend.entities.Album;
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class AlbumRepository {
+public class AlbumRepository extends Repository<Album, Integer> {
     
-    private EntityManager em;
-    
-    public AlbumRepository(EntityManager em) {
-        this.em = em;
+    @Override
+    public Album getById(Integer id) {
+        return manager.find(Album.class, id);
     }
     
-    public Optional<Album> findById(Integer id) {
-        return Optional.ofNullable(em.find(Album.class, id));
+    @Override
+    public Set<Album> getAll() {
+        TypedQuery<Album> query = manager.createQuery("SELECT a FROM Album a", Album.class);
+        return query.getResultList().stream().collect(Collectors.toSet());
     }
     
-    public List<Album> findAll() {
-        TypedQuery<Album> query = em.createQuery("SELECT a FROM Album a", Album.class);
-        return query.getResultList();
+    @Override
+    public Stream<Album> getAllStream() {
+        TypedQuery<Album> query = manager.createQuery("SELECT a FROM Album a", Album.class);
+        return query.getResultList().stream();
     }
+    
+    // ========== MÉTODOS ESPECÍFICOS ==========
     
     public List<Album> findByTitleContaining(String title) {
-        TypedQuery<Album> query = em.createQuery(
+        TypedQuery<Album> query = manager.createQuery(
                 "SELECT a FROM Album a WHERE LOWER(a.title) LIKE LOWER(:title)", 
                 Album.class);
         query.setParameter("title", "%" + title + "%");
@@ -32,18 +37,10 @@ public class AlbumRepository {
     }
     
     public List<Album> findByArtistId(Integer artistId) {
-        TypedQuery<Album> query = em.createQuery(
+        TypedQuery<Album> query = manager.createQuery(
                 "SELECT a FROM Album a WHERE a.artist.id = :artistId", 
                 Album.class);
         query.setParameter("artistId", artistId);
         return query.getResultList();
-    }
-    
-    public void save(Album album) {
-        if (album.getId() == null) {
-            em.persist(album);
-        } else {
-            em.merge(album);
-        }
     }
 }

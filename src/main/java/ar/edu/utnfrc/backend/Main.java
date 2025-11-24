@@ -29,6 +29,7 @@ public class Main {
             // 1. Inicializar base de datos H2
             System.out.println("[1] Inicializando H2 en memoria...");
             DbInitializer.initialize(DataSourceProvider.getDataSource());
+            System.out.println("[OK] DDL ejecutado correctamente.");
             System.out.println("[OK] H2 inicializado correctamente.\n");
             
             // 2. Obtener EntityManager
@@ -85,11 +86,11 @@ public class Main {
     private static void testCreateAndPersist(EntityManager em) {
         System.out.println("  [Test 3.2] Creando y persistiendo datos de prueba...");
         
-        // Usar repositorios
-        ArtistRepository artistRepo = new ArtistRepository(em);
-        AlbumRepository albumRepo = new AlbumRepository(em);
-        TrackRepository trackRepo = new TrackRepository(em);
-        InvoiceRepository invoiceRepo = new InvoiceRepository(em);
+        // Crear repositorios
+        ArtistRepository artistRepo = new ArtistRepository();
+        AlbumRepository albumRepo = new AlbumRepository();
+        TrackRepository trackRepo = new TrackRepository();
+        InvoiceRepository invoiceRepo = new InvoiceRepository();
         
         EntityTransaction tx = em.getTransaction();
         
@@ -99,13 +100,13 @@ public class Main {
             // Crear Artist usando repositorio
             Artist artist = new Artist();
             artist.setName("Test Artist");
-            artistRepo.save(artist);
+            artistRepo.add(artist);
             
             // Crear Album usando repositorio
             Album album = new Album();
             album.setTitle("Test Album");
             album.setArtist(artist);
-            albumRepo.save(album);
+            albumRepo.add(album);
             
             // Obtener MediaType
             MediaType mediaType = em.find(MediaType.class, 1);
@@ -124,7 +125,7 @@ public class Main {
             track.setComposer("Test Composer");
             track.setMilliseconds(180000);
             track.setUnitPrice(0.99);
-            trackRepo.save(track);
+            trackRepo.add(track);
             
             // Crear Customer
             Customer customer = new Customer();
@@ -141,7 +142,7 @@ public class Main {
             invoice.setBillingCity("Springfield");
             invoice.setBillingCountry("USA");
             invoice.setTotal(9.99);
-            invoiceRepo.save(invoice);
+            invoiceRepo.add(invoice);
             
             tx.commit();
             System.out.println("    - Artist creado: " + artist.getName());
@@ -153,10 +154,10 @@ public class Main {
             
             // Test 3.2.1: Leer datos usando repositorios
             tx.begin();
-            Artist readArtist = artistRepo.findById(artist.getId()).orElse(null);
-            Album readAlbum = albumRepo.findById(album.getId()).orElse(null);
-            Track readTrack = trackRepo.findById(track.getId()).orElse(null);
-            Invoice readInvoice = invoiceRepo.findById(invoice.getId()).orElse(null);
+            Artist readArtist = artistRepo.getById(artist.getId());
+            Album readAlbum = albumRepo.getById(album.getId());
+            Track readTrack = trackRepo.getById(track.getId());
+            Invoice readInvoice = invoiceRepo.getById(invoice.getId());
             
             if (readArtist != null && readAlbum != null && readTrack != null) {
                 System.out.println("  [Test 3.2.1] Verificando datos leídos...");
