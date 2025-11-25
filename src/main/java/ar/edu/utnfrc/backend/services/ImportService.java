@@ -4,6 +4,8 @@ import ar.edu.utnfrc.backend.entities.*;
 import ar.edu.utnfrc.backend.repositories.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Servicio para importar datos desde un archivo CSV.
@@ -21,6 +23,12 @@ public class ImportService {
     private MediaTypeRepository mediaTypeRepository;
     private TrackRepository trackRepository;
     
+    // Caches en memoria para evitar consultas repetidas
+    private Map<String, Artist> artistCache;
+    private Map<String, Genre> genreCache;
+    private Map<String, MediaType> mediaTypeCache;
+    private Map<String, Album> albumCache; // Clave: "albumTitle|artistId"
+    
     // Contadores de inserciones
     private int artistsInserted = 0;
     private int albumsInserted = 0;
@@ -35,6 +43,12 @@ public class ImportService {
         this.genreRepository = new GenreRepository();
         this.mediaTypeRepository = new MediaTypeRepository();
         this.trackRepository = new TrackRepository();
+        
+        // Inicializar caches
+        this.artistCache = new HashMap<>();
+        this.genreCache = new HashMap<>();
+        this.mediaTypeCache = new HashMap<>();
+        this.albumCache = new HashMap<>();
     }
     
     /**
@@ -50,6 +64,15 @@ public class ImportService {
         mediaTypesInserted = 0;
         tracksInserted = 0;
         rowsDiscarded = 0;
+        
+        // Limpiar caches
+        artistCache.clear();
+        genreCache.clear();
+        mediaTypeCache.clear();
+        albumCache.clear();
+        
+        // Cargar entidades existentes en memoria (una sola vez)
+        loadExistingEntities();
         
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(getClass().getResourceAsStream("/data.csv")))) {
@@ -79,6 +102,34 @@ public class ImportService {
             
         } catch (Exception e) {
             throw new RuntimeException("Error al importar datos desde CSV: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Carga todas las entidades existentes en memoria para evitar consultas repetidas.
+     */
+    private void loadExistingEntities() {
+        // Cargar todos los artistas
+        for (Artist artist : artistRepository.getAll()) {
+            artistCache.put(artist.getName(), artist);
+        }
+        
+        // Cargar todos los géneros
+        for (Genre genre : genreRepository.getAll()) {
+            genreCache.put(genre.getName(), genre);
+        }
+        
+        // Cargar todos los media types
+        for (MediaType mediaType : mediaTypeRepository.getAll()) {
+            mediaTypeCache.put(mediaType.getName(), mediaType);
+        }
+        
+        // Cargar todos los álbumes con su clave compuesta
+        for (Album album : albumRepository.getAll()) {
+            if (album.getArtist() != null) {
+                String key = album.getTitle() + "|" + album.getArtist().getId();
+                albumCache.put(key, album);
+            }
         }
     }
     
@@ -165,40 +216,45 @@ public class ImportService {
                                 Integer bytes, Double unitPrice, String albumTitle, 
                                 String artistName, String genreName, String mediaTypeName) {
         
-        // Obtener o crear Artist
-        Artist artist = artistRepository.findByName(artistName);
+        // Obtener o crear Artist (usando cache)
+        Artist artist = artistCache.get(artistName);
         if (artist == null) {
             artist = new Artist();
             artist.setName(artistName);
             artistRepository.add(artist);
+            artistCache.put(artistName, artist); // Agregar al cache
             artistsInserted++;
         }
         
-        // Obtener o crear Genre
-        Genre genre = genreRepository.findByName(genreName);
+        // Obtener o crear Genre (usando cache)
+        Genre genre = genreCache.get(genreName);
         if (genre == null) {
             genre = new Genre();
             genre.setName(genreName);
             genreRepository.add(genre);
+            genreCache.put(genreName, genre); // Agregar al cache
             genresInserted++;
         }
         
-        // Obtener o crear MediaType
-        MediaType mediaType = mediaTypeRepository.findByName(mediaTypeName);
+        // Obtener o crear MediaType (usando cache)
+        MediaType mediaType = mediaTypeCache.get(mediaTypeName);
         if (mediaType == null) {
             mediaType = new MediaType();
             mediaType.setName(mediaTypeName);
             mediaTypeRepository.add(mediaType);
+            mediaTypeCache.put(mediaTypeName, mediaType); // Agregar al cache
             mediaTypesInserted++;
         }
         
-        // Obtener o crear Album (necesita el artista ya creado)
-        Album album = albumRepository.findByTitleAndArtist(albumTitle, artist.getId());
+        // Obtener o crear Album (usando cache con clave compuesta)
+        String albumKey = albumTitle + "|" + artist.getId();
+        Album album = albumCache.get(albumKey);
         if (album == null) {
             album = new Album();
             album.setTitle(albumTitle);
             album.setArtist(artist);
             albumRepository.add(album);
+            albumCache.put(albumKey, album); // Agregar al cache
             albumsInserted++;
         }
         
