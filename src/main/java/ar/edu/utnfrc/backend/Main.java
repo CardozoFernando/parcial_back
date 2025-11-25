@@ -3,209 +3,178 @@ package ar.edu.utnfrc.backend;
 import ar.edu.utnfrc.backend.infra.DataSourceProvider;
 import ar.edu.utnfrc.backend.infra.DbInitializer;
 import ar.edu.utnfrc.backend.infra.LocalEntityManagerProvider;
-import ar.edu.utnfrc.backend.repositories.ArtistRepository;
+import ar.edu.utnfrc.backend.services.ImportService;
+import ar.edu.utnfrc.backend.repositories.GenreRepository;
+import ar.edu.utnfrc.backend.entities.Genre;
 import ar.edu.utnfrc.backend.repositories.AlbumRepository;
-import ar.edu.utnfrc.backend.repositories.TrackRepository;
-import ar.edu.utnfrc.backend.repositories.InvoiceRepository;
-import ar.edu.utnfrc.backend.entities.Artist;
 import ar.edu.utnfrc.backend.entities.Album;
-import ar.edu.utnfrc.backend.entities.Track;
-import ar.edu.utnfrc.backend.entities.MediaType;
-import ar.edu.utnfrc.backend.entities.Invoice;
-import ar.edu.utnfrc.backend.entities.Customer;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityTransaction;
 import jakarta.persistence.TypedQuery;
-import java.time.LocalDate;
+import java.util.List;
 
 public class Main {
     
     public static void main(String[] args) {
         try {
-            System.out.println("========================================");
-            System.out.println("Iniciando smoke tests de la aplicación");
-            System.out.println("========================================\n");
-            
-            // 1. Inicializar base de datos H2
-            System.out.println("[1] Inicializando H2 en memoria...");
+            // 1. Inicializar base de datos H2 embebido en memoria
+            System.out.println("Inicializando base de datos H2 en memoria...");
             DbInitializer.initialize(DataSourceProvider.getDataSource());
-            System.out.println("[OK] DDL ejecutado correctamente.");
-            System.out.println("[OK] H2 inicializado correctamente.\n");
+            System.out.println("Base de datos inicializada correctamente.\n");
             
-            // 2. Obtener EntityManager
-            System.out.println("[2] Obteniendo EntityManager...");
-            EntityManager em = LocalEntityManagerProvider.getEntityManager();
-            System.out.println("[OK] EntityManager creado.\n");
+            // 2. Importar datos desde CSV
+            System.out.println("Importando datos desde data.csv...");
+            ImportService importService = new ImportService();
+            importService.importFromCsv();
+            System.out.println("Importación completada.\n");
             
-            // 3. Realizar smoke tests
-            System.out.println("[3] Ejecutando smoke tests...\n");
+            // 3. Generar Informe 1 — Resultado de la importación
+            generateInforme1();
             
-            // Test 3.1: Contar registros existentes
-            testCountRecords(em);
+            // 4. Generar Informe 2 — Listado de Álbumes más largos
+            generateInforme2();
             
-            // Test 3.2: Crear y persistir datos de prueba
-            testCreateAndPersist(em);
+            // 5. Generar Informe 3 — Ranking de Precio promedio por género
+            generateInforme3();
             
-            // Test 3.3: Validar métodos de utilidad
-            testUtilityMethods(em);
-            
-            // Cerrar EntityManager
-            em.close();
+            // Cerrar EntityManagerFactory
             LocalEntityManagerProvider.closeFactory();
             
-            System.out.println("\n========================================");
-            System.out.println("[OK] H2 + DDL inicializados y mapeos JPA verificados.");
-            System.out.println("========================================");
-            
         } catch (Exception e) {
-            System.err.println("[ERROR] Fallo en la inicialización:");
+            System.err.println("[ERROR] Fallo en la ejecución:");
             e.printStackTrace();
+            System.exit(1);
         }
     }
     
-    private static void testCountRecords(EntityManager em) {
-        System.out.println("  [Test 3.1] Contando registros en tablas...");
-        
-        TypedQuery<Long> artistQuery = em.createQuery(
-                "SELECT COUNT(a) FROM Artist a", Long.class);
-        long artistCount = artistQuery.getSingleResult();
-        System.out.println("    - Artistas: " + artistCount);
-        
-        TypedQuery<Long> genreQuery = em.createQuery(
-                "SELECT COUNT(g) FROM Genre g", Long.class);
-        long genreCount = genreQuery.getSingleResult();
-        System.out.println("    - Géneros: " + genreCount);
-        
-        TypedQuery<Long> mediaTypeQuery = em.createQuery(
-                "SELECT COUNT(m) FROM MediaType m", Long.class);
-        long mediaTypeCount = mediaTypeQuery.getSingleResult();
-        System.out.println("    - Tipos de media: " + mediaTypeCount);
-        System.out.println();
-    }
-    
-    private static void testCreateAndPersist(EntityManager em) {
-        System.out.println("  [Test 3.2] Creando y persistiendo datos de prueba...");
-        
-        // Crear repositorios
-        ArtistRepository artistRepo = new ArtistRepository();
-        AlbumRepository albumRepo = new AlbumRepository();
-        TrackRepository trackRepo = new TrackRepository();
-        InvoiceRepository invoiceRepo = new InvoiceRepository();
-        
-        EntityTransaction tx = em.getTransaction();
+    /**
+     * Genera el Informe 1 — Resultado de la importación.
+     * Muestra los totales reales de registros en la base de datos usando consultas COUNT directas.
+     */
+    private static void generateInforme1() {
+        EntityManager em = LocalEntityManagerProvider.getEntityManager();
         
         try {
-            tx.begin();
+            TypedQuery<Long> artistQuery = em.createQuery("SELECT COUNT(a) FROM Artist a", Long.class);
+            long totalArtists = artistQuery.getSingleResult();
             
-            // Crear Artist usando repositorio
-            Artist artist = new Artist();
-            artist.setName("Test Artist");
-            artistRepo.add(artist);
+            TypedQuery<Long> albumQuery = em.createQuery("SELECT COUNT(a) FROM Album a", Long.class);
+            long totalAlbums = albumQuery.getSingleResult();
             
-            // Crear Album usando repositorio
-            Album album = new Album();
-            album.setTitle("Test Album");
-            album.setArtist(artist);
-            albumRepo.add(album);
+            TypedQuery<Long> genreQuery = em.createQuery("SELECT COUNT(g) FROM Genre g", Long.class);
+            long totalGenres = genreQuery.getSingleResult();
             
-            // Obtener MediaType
-            MediaType mediaType = em.find(MediaType.class, 1);
-            if (mediaType == null) {
-                System.out.println("    [WARNING] No hay MediaType disponible. Creando uno...");
-                mediaType = new MediaType();
-                mediaType.setName("MPEG");
-                em.persist(mediaType);
-            }
+            TypedQuery<Long> mediaTypeQuery = em.createQuery("SELECT COUNT(m) FROM MediaType m", Long.class);
+            long totalMediaTypes = mediaTypeQuery.getSingleResult();
             
-            // Crear Track usando repositorio
-            Track track = new Track();
-            track.setName("Test Track");
-            track.setAlbum(album);
-            track.setMediaType(mediaType);
-            track.setComposer("Test Composer");
-            track.setMilliseconds(180000);
-            track.setUnitPrice(0.99);
-            trackRepo.add(track);
+            TypedQuery<Long> trackQuery = em.createQuery("SELECT COUNT(t) FROM Track t", Long.class);
+            long totalTracks = trackQuery.getSingleResult();
             
-            // Crear Customer
-            Customer customer = new Customer();
-            customer.setFirstName("John");
-            customer.setLastName("Doe");
-            customer.setEmail("john@example.com");
-            em.persist(customer);
-            
-            // Crear Invoice usando repositorio
-            Invoice invoice = new Invoice();
-            invoice.setCustomer(customer);
-            invoice.setInvoiceDate(LocalDate.now());
-            invoice.setBillingAddress("123 Main St");
-            invoice.setBillingCity("Springfield");
-            invoice.setBillingCountry("USA");
-            invoice.setTotal(9.99);
-            invoiceRepo.add(invoice);
-            
-            tx.commit();
-            System.out.println("    - Artist creado: " + artist.getName());
-            System.out.println("    - Album creado: " + album.getTitle());
-            System.out.println("    - Track creado: " + track.getName());
-            System.out.println("    - Customer creado: " + customer.getFirstName() + " " + customer.getLastName());
-            System.out.println("    - Invoice creado: ID " + invoice.getId() + " - Total: $" + invoice.getTotal());
-            System.out.println();
-            
-            // Test 3.2.1: Leer datos usando repositorios
-            tx.begin();
-            Artist readArtist = artistRepo.getById(artist.getId());
-            Album readAlbum = albumRepo.getById(album.getId());
-            Track readTrack = trackRepo.getById(track.getId());
-            Invoice readInvoice = invoiceRepo.getById(invoice.getId());
-            
-            if (readArtist != null && readAlbum != null && readTrack != null) {
-                System.out.println("  [Test 3.2.1] Verificando datos leídos...");
-                System.out.println("    - Artist encontrado: " + readArtist.getName());
-                System.out.println("    - Album encontrado: " + readAlbum.getTitle());
-                System.out.println("    - Track encontrado: " + readTrack.getName());
-            }
-            
-            if (readInvoice != null) {
-                System.out.println("    - Invoice encontrado: Total $" + readInvoice.getTotal());
-                System.out.println("    - Invoice es válida: " + readInvoice.hasValidTotal());
-                System.out.println();
-            }
-            tx.commit();
-            
-        } catch (Exception e) {
-            if (tx.isActive()) {
-                tx.rollback();
-            }
-            System.err.println("    [ERROR] " + e.getMessage());
+            System.out.println("\n========================================");
+            System.out.println("Informe 1 — Resultado de la importación");
+            System.out.println("========================================");
+            System.out.println("Total de artistas insertados: " + totalArtists);
+            System.out.println("Total de álbumes insertados: " + totalAlbums);
+            System.out.println("Total de géneros insertados: " + totalGenres);
+            System.out.println("Total de media types insertados: " + totalMediaTypes);
+            System.out.println("Total de tracks insertados: " + totalTracks);
+            System.out.println("========================================\n");
+        } finally {
+            em.close();
         }
     }
     
-    private static void testUtilityMethods(EntityManager em) {
-        System.out.println("  [Test 3.3] Validando métodos de utilidad...");
+    /**
+     * Genera el Informe 2 — Listado de Álbumes más largos.
+     * Muestra los 10 álbumes más largos excluyendo tracks de video.
+     */
+    private static void generateInforme2() {
+        AlbumRepository albumRepository = new AlbumRepository();
+        List<Object[]> longestAlbums = albumRepository.findLongestAlbums(10);
         
-        TypedQuery<Track> trackQuery = em.createQuery(
-                "SELECT t FROM Track t WHERE t.name = 'Test Track'", Track.class);
+        System.out.println("\n========================================");
+        System.out.println("Informe 2 — Listado de Álbumes más largos");
+        System.out.println("========================================");
         
-        try {
-            Track testTrack = trackQuery.getSingleResult();
-            
-            // Verificar método getDurationInMinutes()
-            double durationMinutes = testTrack.getDurationInMinutes();
-            System.out.println("    - Duración del track: " + durationMinutes + " minutos");
-            
-            // Verificar método hasValidPrice()
-            boolean validPrice = testTrack.hasValidPrice();
-            System.out.println("    - Precio válido: " + validPrice);
-            
-            if (durationMinutes > 0 && validPrice) {
-                System.out.println("    [OK] Métodos de utilidad funcionando correctamente.");
+        if (longestAlbums.isEmpty()) {
+            System.out.println("No se encontraron álbumes.");
+        } else {
+            int position = 1;
+            for (Object[] result : longestAlbums) {
+                Album album = (Album) result[0];
+                Long totalMilliseconds = (Long) result[1];
+                
+                String albumTitle = album.getTitle();
+                String artistName = album.getArtist() != null ? album.getArtist().getName() : "Desconocido";
+                String duration = formatDuration(totalMilliseconds);
+                
+                System.out.println(position + ". " + albumTitle + " - " + artistName);
+                System.out.println("   Duración total: " + duration);
+                position++;
             }
-            System.out.println();
-            
-        } catch (Exception e) {
-            System.out.println("    [INFO] No hay datos de prueba para validar métodos de utilidad.");
-            System.out.println();
         }
+        
+        System.out.println("========================================\n");
+    }
+    
+    /**
+     * Formatea una duración en milliseconds a formato minutos:segundos.
+     * Trunca la parte decimal de los segundos.
+     * 
+     * @param milliseconds duración en milliseconds
+     * @return string formateado como "MM:SS"
+     */
+    private static String formatDuration(Long milliseconds) {
+        if (milliseconds == null || milliseconds <= 0) {
+            return "0:00";
+        }
+        
+        long totalSeconds = milliseconds / 1000;
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        
+        return String.format("%d:%02d", minutes, seconds);
+    }
+    
+    /**
+     * Genera el Informe 3 — Ranking de Precio promedio por género.
+     * Muestra los 5 géneros con mayor precio promedio excluyendo tracks de video.
+     */
+    private static void generateInforme3() {
+        GenreRepository genreRepository = new GenreRepository();
+        List<Object[]> genresByPrice = genreRepository.findGenresByAveragePrice(5);
+        
+        System.out.println("\n========================================");
+        System.out.println("Informe 3 — Ranking de Precio promedio por género");
+        System.out.println("========================================");
+        
+        if (genresByPrice.isEmpty()) {
+            System.out.println("No se encontraron géneros.");
+        } else {
+            for (Object[] result : genresByPrice) {
+                Genre genre = (Genre) result[0];
+                Double avgPrice = (Double) result[1];
+                Long trackCount = (Long) result[2];
+                
+                String genreName = genre.getName();
+                String formattedPrice = formatPrice(avgPrice);
+                
+                System.out.println(genreName + " – " + formattedPrice + " – " + trackCount);
+            }
+        }
+        
+        System.out.println("========================================\n");
+    }
+    
+    /**
+     * Formatea un precio a formato con 2 decimales.
+     * 
+     * @param price precio a formatear
+     * @return string formateado con 2 decimales
+     */
+    private static String formatPrice(Double price) {
+        if (price == null) {
+            return "0.00";
+        }
+        return String.format("%.2f", price);
     }
 }

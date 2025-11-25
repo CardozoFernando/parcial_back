@@ -35,4 +35,22 @@ public class ArtistRepository extends Repository<Artist, Integer> {
         query.setParameter("name", "%" + name + "%");
         return query.getResultList();
     }
+    
+    /**
+     * Busca un artista por su nombre exacto (case-sensitive).
+     * 
+     * @param name el nombre del artista a buscar
+     * @return el artista encontrado o null si no existe
+     */
+    public Artist findByName(String name) {
+        TypedQuery<Artist> query = manager.createQuery(
+                "SELECT a FROM Artist a WHERE a.name = :name", 
+                Artist.class);
+        query.setParameter("name", name);
+        try {
+            return query.getSingleResult();
+        } catch (jakarta.persistence.NoResultException e) {
+            return null;
+        }
+    }
 }

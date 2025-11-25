@@ -43,4 +43,46 @@ public class AlbumRepository extends Repository<Album, Integer> {
         query.setParameter("artistId", artistId);
         return query.getResultList();
     }
+    
+    /**
+     * Busca un álbum por su título exacto y artista (case-sensitive).
+     * 
+     * @param title el título del álbum a buscar
+     * @param artistId el ID del artista
+     * @return el álbum encontrado o null si no existe
+     */
+    public Album findByTitleAndArtist(String title, Integer artistId) {
+        TypedQuery<Album> query = manager.createQuery(
+                "SELECT a FROM Album a WHERE a.title = :title AND a.artist.id = :artistId", 
+                Album.class);
+        query.setParameter("title", title);
+        query.setParameter("artistId", artistId);
+        try {
+            return query.getSingleResult();
+        } catch (jakarta.persistence.NoResultException e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Obtiene los álbumes más largos (top N) excluyendo tracks de video.
+     * Retorna una lista de Object[] donde:
+     * [0] = Album
+     * [1] = Long (duración total en milliseconds)
+     * 
+     * @param limit número máximo de álbumes a retornar
+     * @return lista de arrays con álbum y duración total
+     */
+    @SuppressWarnings("unchecked")
+    public List<Object[]> findLongestAlbums(int limit) {
+        String jpql = "SELECT a, SUM(t.milliseconds) as totalDuration " +
+                      "FROM Album a JOIN a.tracks t " +
+                      "WHERE t.mediaType.name != 'Protected MPEG-4 video file' " +
+                      "GROUP BY a.id, a.title, a.artist.id " +
+                      "ORDER BY totalDuration DESC";
+        
+        jakarta.persistence.Query query = manager.createQuery(jpql);
+        query.setMaxResults(limit);
+        return query.getResultList();
+    }
 }
